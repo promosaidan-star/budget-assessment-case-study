@@ -1,0 +1,42 @@
+import sys, os; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import pandas as pd, numpy as np
+from load import load
+pd.set_option("display.width", 250); pd.set_option("display.max_columns", 40)
+s, w, braw = load(sys.argv[1])
+print(s.shape, list(s.columns))
+for c in ["Month","Year","Business Line","Channel","Item Group","Branded/PL","StateS"]:
+    print("\n##", c); print(s[c].value_counts(dropna=False).to_string())
+print("\n## numeric checks")
+for c in ["Quantity","Total Amt","LBSperCase","Lbs"]:
+    x = pd.to_numeric(s[c], errors="coerce")
+    print(c, "non-numeric:", x.isna().sum(), "neg:", (x<0).sum(), "zero:", (x==0).sum(), "sum:", round(x.sum(),2), "min/max:", x.min(), x.max())
+    bad = s[c][x.isna()]
+    if len(bad): print("   bad values:", bad.unique()[:20])
+print("\n## rows by Year-Month"); print(s.groupby(["Year","Month"]).size().unstack(0).to_string())
+print("\n## revenue by Year-Month")
+s["amt"]=pd.to_numeric(s["Total Amt"],errors="coerce"); s["q"]=pd.to_numeric(s["Quantity"],errors="coerce"); s["lbs"]=pd.to_numeric(s["Lbs"],errors="coerce"); s["lpc"]=pd.to_numeric(s["LBSperCase"],errors="coerce")
+print(s.pivot_table(index="Month",columns="Year",values="amt",aggfunc="sum").round(0).to_string())
+print("\n## Lbs == Quantity*LBSperCase ?")
+d = (s["lbs"] - s["q"]*s["lpc"]).abs()
+print("mismatch rows:", (d>0.5).sum()); print(s[d>0.5].head(15).to_string())
+print("\n## Combined == cust:item ?")
+comb = s["Customer code"].astype(str)+":"+s["ItemCode"].astype(str)
+print("mismatch:", (comb!=s["Combined"].astype(str)).sum()); print(s[comb!=s["Combined"].astype(str)].head(10).to_string())
+print("\n## dup full rows:", s.duplicated().sum(), "| dup on Y/M/Combined:", s.duplicated(["Year","Month","Combined"]).sum())
+print("\n## LBSperCase zero/1/odd by item"); print(s.groupby("ItemCode")["lpc"].agg(["nunique","min","max"]).query("nunique>1").to_string())
+print("\n## weights file"); print(w.dtypes); print(w.describe(include="all").to_string())
+print("dup items in weights:", w["ItemCode"].duplicated().sum())
+wi = set(w["ItemCode"].astype(str).str.strip()); si = set(s["ItemCode"].astype(str).str.strip())
+print("sales items:", len(si), "in weights:", len(si & wi), "missing:", sorted(si - wi)[:40])
+m = s.merge(w.assign(ItemCode=w["ItemCode"]), on="ItemCode", how="left")
+m["cw"]=pd.to_numeric(m["CaseWeight"],errors="coerce")
+dd=(m["cw"]-m["lpc"]).abs()
+print("sales lpc vs weights file mismatch rows:", (dd>0.01).sum(), "missing wt:", m["cw"].isna().sum())
+print(m[dd>0.01].groupby("ItemCode")[["lpc","cw"]].first().head(30).to_string())
+print("\n## attribute consistency: items w/ >1 group / brand / business; customers w/ >1 channel / business / state")
+for k,cols in [("ItemCode",["Item Group","Branded/PL","Business Line","Channel"]),("Customer code",["Channel","Business Line","StateS","Branded/PL"])]:
+    for c in cols:
+        n = s.groupby(k)[c].nunique(dropna=False)
+        print(k, c, "multi:", (n>1).sum(), "of", len(n))
+print("\n## budget raw header rows"); print(braw.iloc[:5].to_string())
+print(braw.iloc[-6:].to_string())

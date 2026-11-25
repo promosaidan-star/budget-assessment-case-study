@@ -1,0 +1,34 @@
+# Allow-list: ignore everything, then publish only the paths below.
+# The client data, the cleaned data and the Tableau workbook (which embeds the data) are never published.
+/*
+!/.gitignore
+!/README.md
+!/scripts/
+!/screenshots/
+!/deliverables/
+!/docs/
+
+# scripts: the pipeline and analysis code only
+/scripts/*
+!/scripts/load.py
+!/scripts/profile.py
+!/scripts/profile2.py
+!/scripts/build_model.py
+!/scripts/analyze1.py
+!/scripts/analyze2.py
+!/scripts/export_for_tableau.py
+!/scripts/build_workbook.py
+!/scripts/package_twbx.py
+!/scripts/snap.ps1
+!/scripts/make_submission_doc.py
+
+# never publish data or workbooks, wherever they end up
+*.csv
+*.xlsx
+*.xls
+*.twb
+*.twbx
+*.twbr
+*.tds
+*.tdsx
+*.hyper
